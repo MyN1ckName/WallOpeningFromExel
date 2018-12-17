@@ -17,7 +17,6 @@ public class WorkFile
 {
 	OpenFileDialog ofd = new OpenFileDialog();
 
-	//string path = null;
 	public OpenFileDialog ShowFileDialog()
 	{
 		ofd.ShowDialog();
@@ -26,9 +25,6 @@ public class WorkFile
 	
 	public string Path
 	{
-		get
-		{			
-			return ShowFileDialog().FileName;
-		}
+		get	{return ShowFileDialog().FileName;}
 	}		
 }
