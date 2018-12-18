@@ -25,11 +25,33 @@ public class Command : IExternalCommand
 		UIApplication uiApp = commandData.Application;
 		Document doc = uiApp.ActiveUIDocument.Document;
 
-		WorkFile file = new WorkFile();
-		file.ShowFileDialog();
+		OpenFile openFile = new OpenFile();
+		openFile.ShowFileDialog();
 		//string st = file.Path;
-		TaskDialog.Show("show", (file.Path).ToString());	
+		//TaskDialog.Show("show", (openFile.Path).ToString());
 
+		ExeleFile xlFale = new ExeleFile();
+		var xlRange = xlFale.getExeleRange(openFile.Path);
+
+
+		xlFale.ColumnNamber("WIDTH", xlRange);
+
+		
 		return Result.Succeeded;
+	}
+	public class OpenFile
+	{
+		OpenFileDialog ofd = new OpenFileDialog();
+
+		public OpenFileDialog ShowFileDialog()
+		{
+			ofd.ShowDialog();
+			return ofd;
+		}
+
+		public string Path
+		{
+			get { return ShowFileDialog().FileName; }
+		}
 	}
 }
