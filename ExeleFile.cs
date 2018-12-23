@@ -14,19 +14,34 @@ using System.Windows.Forms;
 
 public class ExeleFile
 {
-	public Exele.Range getExeleRange(string path)
+	
+	Exele.Application xlApp = new Exele.Application();
+
+	public Exele.Workbooks xlWorkbooks (Exele.Application xlApp)
 	{
-		Exele.Application xlApp = new Exele.Application();
 		Exele.Workbooks xlWorkbooks = xlApp.Workbooks;
-		Exele.Workbook xlWorkbook = xlWorkbooks.Open(@path);
-		Exele._Worksheet xlWorksheet = xlWorkbook.Sheets[1];
-		Exele.Range xlRange = xlWorksheet.UsedRange;
-
-		return xlRange;
-
-		//int rowCount = xlRange.Rows.Count;
-		//int colCount = xlRange.Columns.Count;
+		return xlWorkbooks;
 	}
+	public Exele.Workbook xlWorkbook (Exele.Workbooks xlWorkbooks, 
+		string path)
+	{
+		Exele.Workbook xlWorkbook = xlWorkbooks.Open(path);
+		return xlWorkbook;
+	}
+	public Exele._Worksheet xlWorksheet (Exele.Workbook xlWorkbook)
+		{
+			Exele._Worksheet xlWorksheet = xlWorkbook.Sheets[1];
+			return xlWorksheet;
+		}
+	public Exele.Range xlRange (Exele._Worksheet xlWorksheet)
+		{
+			Exele.Range xlRange = xlWorksheet.UsedRange;
+			return xlRange;
+		}
+	public Exele.Application App
+			{
+				get { return xlApp; }
+			}
 
 	public int ColumnNamber(string name, Exele.Range xlRange)
 	{
@@ -46,5 +61,36 @@ public class ExeleFile
 			}				
 		} 
 		return colNamber;
+	}
+
+	public string CellsContent(int rowNamber, 
+		int colNamber, Exele.Range xlRange)
+	{
+		string content = 
+			xlRange.Cells[rowNamber, colNamber].Value2.ToString();
+
+		return content;
+	}
+
+	public void CloseAndQuit(
+		Exele.Application xlApp,
+		Exele.Workbooks xlWorbooks,
+		Exele.Workbook xlWorkbook,
+		Exele._Worksheet xlWorksheet,
+		Exele.Range xlRange)
+	{
+		GC.Collect();
+		GC.WaitForPendingFinalizers();
+
+		Marshal.ReleaseComObject(xlRange);
+		Marshal.ReleaseComObject(xlWorksheet);
+
+		xlWorkbook.Close();
+		Marshal.ReleaseComObject(xlWorkbook);
+
+		Marshal.ReleaseComObject(xlWorbooks);
+
+		xlApp.Quit();
+		Marshal.ReleaseComObject(xlApp);
 	}
 }
