@@ -66,9 +66,8 @@ public class ExeleFile
 	public string CellsContent(int rowNamber, 
 		int colNamber, Exele.Range xlRange)
 	{
-		string content = 
+		string content =
 			xlRange.Cells[rowNamber, colNamber].Value2.ToString();
-
 		return content;
 	}
 
