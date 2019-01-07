@@ -67,11 +67,11 @@ public class ExeleFile
 		int colNamber, Exele.Range xlRange)
 	{
 		string content =
-			xlRange.Cells[rowNamber, colNamber].Value2.ToString();
+			xlRange.Cells[rowNamber, colNamber].Value2;
 		return content;
 	}
 
-	public void CloseAndQuit(
+	public void CloseAndQuit(												
 		Exele.Application xlApp,
 		Exele.Workbooks xlWorbooks,
 		Exele.Workbook xlWorkbook,
