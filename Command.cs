@@ -70,24 +70,49 @@ public class Command : IExternalCommand
 		//XYZ coords = new XYZ(xlFale.CellsContent(2, 4, xlRange) / 304.8, xlFale.CellsContent(2, 5, xlRange) / 304.8, level.Elevation);
 
 		FilteredElementCollector collector = new FilteredElementCollector(doc);
-	  
+		/*
 		FamilySymbol familySymbol = collector.OfClass(typeof(FamilySymbol)).  // НЕ РАБОТАЕТ СО СТРОКИ 74
 			OfCategory(BuiltInCategory.OST_Windows).
 			OfClass(typeof(Element)).FirstOrDefault(e => e.Name.
 			Equals("231_Проем прямоуг (Окно_Стена)")) as FamilySymbol;
 		if (!familySymbol.IsActive)
 		{ familySymbol.Activate(); }
+		*/
 
-		Element el = new FilteredElementCollector(doc).OfClass(typeof(Element)).
+		/////////////////
+
+		collector.OfClass(typeof(FamilySymbol)).
+			OfCategory(BuiltInCategory.OST_Windows);
+
+		FamilySymbol familySymbol = collector.
+			FirstOrDefault(e => e.Name.
+			Equals("231_Проем прямоуг (Окно_Стена)")) as FamilySymbol; 
+
+		if (!familySymbol.IsActive)
+		{ familySymbol.Activate(); }
+
+		///////////////
+
+		Element el = new FilteredElementCollector(doc).
 			OfCategory(BuiltInCategory.OST_Walls).ToElements() as Element;
 
 		using (Transaction t = new Transaction(doc, "Create"))
 		{
-			t.Start("");
+			t.Start("Start");
 			try
 			{
-				doc.Create.NewFamilyInstance(coords, familySymbol, el,
+				Element e = doc.Create.NewFamilyInstance(coords, familySymbol, el,
 					level, StructuralType.NonStructural);
+				Parameter p1 = e.LookupParameter("Рзм.Ширина");
+				Parameter p2 = e.LookupParameter("Рзм.Высота");
+				Parameter p3 = e.get_Parameter(BuiltInParameter.SCHEDULE_LEVEL_PARAM);
+				Parameter p4 = e.get_Parameter(BuiltInParameter.INSTANCE_SILL_HEIGHT_PARAM);
+
+				p1.Set(1550.0 / 304.8);
+				p2.Set(650.0 / 304.8);
+				p3.Set(levelId);
+				p4.Set(0.0);
+
 			}
 			catch { }
 			t.Commit();
