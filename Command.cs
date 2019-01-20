@@ -116,7 +116,7 @@ public class Command : IExternalCommand
 			}
 			catch { }
 			t.Commit();
-		} 
+		}
 
 
 		/*
@@ -133,9 +133,9 @@ public class Command : IExternalCommand
 	}
 	public class OpenFile
 	{
-		OpenFileDialog ofd = new OpenFileDialog();
+		static OpenFileDialog ofd = new OpenFileDialog();
 
-		public OpenFileDialog ShowFileDialog()
+		static OpenFileDialog ShowFileDialog()
 		{
 			ofd.Filter = "Excel|*.xls";
 			ofd.ShowDialog();
