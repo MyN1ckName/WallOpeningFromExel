@@ -2,7 +2,7 @@
 <RevitAddIns>
   <AddIn Type="Command">
     <Name>myAppTest</Name>
-    <FullClassName>Command</FullClassName>
+    <FullClassName>RevitCommand.Command</FullClassName>
     <VisibilityMode>AlwaysVisible</VisibilityMode>
     <Assembly>WallOpeningFromExel.dll</Assembly>
     <AddInId>7273cc61-f3c2-479b-8209-c960c3d72630</AddInId>

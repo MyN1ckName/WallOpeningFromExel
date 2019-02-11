@@ -4,7 +4,7 @@ using System.Linq;
 using System.Windows;
 using Microsoft.Win32;
 using System.Diagnostics;
-using System.Windows.Forms;
+using System.Collections;
 
 using Autodesk.Revit.DB;
 using Autodesk.Revit.DB.Architecture;
@@ -13,137 +13,166 @@ using Autodesk.Revit.UI;
 using Autodesk.Revit.UI.Selection;
 using Autodesk.Revit.ApplicationServices;
 using Autodesk.Revit.Attributes;
+using Autodesk.Revit.DB.Events;
+using Autodesk.Revit.Utility;
 
-[TransactionAttribute(TransactionMode.Manual)]
-[RegenerationAttribute(RegenerationOption.Manual)]
+using ExeleCommand;
 
-public class Command : IExternalCommand
+
+namespace RevitCommand
 {
-	public Result Execute(ExternalCommandData commandData,
-		ref string messege,
-		ElementSet elements)
+
+	[TransactionAttribute(TransactionMode.Manual)]
+	[RegenerationAttribute(RegenerationOption.Manual)]
+
+	public class Command : IExternalCommand
 	{
-		UIApplication uiApp = commandData.Application;
-		Document doc = uiApp.ActiveUIDocument.Document;
+		List<ElementId> _added_element_ids = new List<ElementId>();
 
-		ExeleFile xlFale = new ExeleFile();
-		OpenFile openFile = new OpenFile();
-
-		
-		var xlWorkbooks = xlFale.xlWorkbooks(xlFale.App);
-		var xlWorkbook = xlFale.xlWorkbook(xlWorkbooks,
-			openFile.Path);
-		var xlWorksheet = xlFale.xlWorksheet(xlWorkbook);
-		var xlRange = xlFale.xlRange(xlWorksheet);
-
-		/*
-		string st = (xlFale.CellsContent(2,4, xlRange)).ToString();
-		TaskDialog.Show("show", st.ToString());
-		xlFale.CloseAndQuit(xlFale.App, xlWorkbooks, xlWorkbook,
-		xlWorksheet, xlRange);
-		*/	
-
-		//NewFamilyInstance Method (XYZ, FamilySymbol, Element, Level, StructuralType) 
-				
-		Autodesk.Revit.DB.View view = doc.ActiveView;						 // Нужно добавить фильтр, вид должен быть планом!!!
-		FilteredElementCollector lvlCollector = new FilteredElementCollector(doc);
-		ICollection<Element> lvlCollection = lvlCollector.OfClass(typeof(Level)).ToElements();
-
-		ElementId levelId = null;
-		Level level = null; 
-
-		foreach(Element l in lvlCollection)
+		public Result Execute(ExternalCommandData commandData,
+			ref string messege,
+			ElementSet elements)
 		{
-			Level lvl = l as Level;
-			if(lvl.Name == view.get_Parameter(BuiltInParameter.PLAN_VIEW_LEVEL).AsString())
-				{
-				levelId = lvl.Id;
-				level = lvl;
-				} 
-		}
-		
-		double dx = Convert.ToDouble(xlFale.CellsContent(2, 4, xlRange)) / 304.8;
-		double dy = Convert.ToDouble(xlFale.CellsContent(2, 5, xlRange)) / 304.8;
+			UIApplication uiApp = commandData.Application;
+			Document doc = uiApp.ActiveUIDocument.Document;
+			Application app = uiApp.Application;
 
-		XYZ coords = new XYZ(dx, dy, level.Elevation); // В XYZ должен зайти doudle!!!
+			//ExeleFile xsl = new ExeleFile();
 
-		//XYZ coords = new XYZ(xlFale.CellsContent(2, 4, xlRange) / 304.8, xlFale.CellsContent(2, 5, xlRange) / 304.8, level.Elevation);
+			Reference pickedRef = null;
+			Selection sel = uiApp.ActiveUIDocument.Selection;
+			WallPickFilter selFiter = new WallPickFilter();
+			pickedRef = sel.PickObject(ObjectType.Element, selFiter, "Выберите стену");
 
-		FilteredElementCollector collector = new FilteredElementCollector(doc);
-		/*
-		FamilySymbol familySymbol = collector.OfClass(typeof(FamilySymbol)).  // НЕ РАБОТАЕТ СО СТРОКИ 74
-			OfCategory(BuiltInCategory.OST_Windows).
-			OfClass(typeof(Element)).FirstOrDefault(e => e.Name.
-			Equals("231_Проем прямоуг (Окно_Стена)")) as FamilySymbol;
-		if (!familySymbol.IsActive)
-		{ familySymbol.Activate(); }
-		*/
+			Element elem = doc.GetElement(pickedRef.ElementId);
 
-		/////////////////
+			OpeningWatcherUpdater _updater = new OpeningWatcherUpdater(app.ActiveAddInId);
+			UpdaterRegistry.RegisterUpdater(_updater, true);
+			UpdaterRegistry.AddTrigger(_updater.GetUpdaterId(),
+				new ElementCategoryFilter(BuiltInCategory.OST_Windows),
+				Element.GetChangeTypeElementAddition());
 
-		collector.OfClass(typeof(FamilySymbol)).
-			OfCategory(BuiltInCategory.OST_Windows);
-
-		FamilySymbol familySymbol = collector.
-			FirstOrDefault(e => e.Name.
-			Equals("231_Проем прямоуг (Окно_Стена)")) as FamilySymbol; 
-
-		if (!familySymbol.IsActive)
-		{ familySymbol.Activate(); }
-
-		///////////////
-
-		Element el = new FilteredElementCollector(doc).
-			OfCategory(BuiltInCategory.OST_Walls).ToElements() as Element;
-
-		using (Transaction t = new Transaction(doc, "Create"))
-		{
-			t.Start("Start");
-			try
+			using (Transaction t = new Transaction(doc, "CreateWindows"))
 			{
-				Element e = doc.Create.NewFamilyInstance(coords, familySymbol, el,
-					level, StructuralType.NonStructural);
-				Parameter p1 = e.LookupParameter("Рзм.Ширина");
-				Parameter p2 = e.LookupParameter("Рзм.Высота");
-				Parameter p3 = e.get_Parameter(BuiltInParameter.SCHEDULE_LEVEL_PARAM);
-				Parameter p4 = e.get_Parameter(BuiltInParameter.INSTANCE_SILL_HEIGHT_PARAM);
-
-				p1.Set(1550.0 / 304.8);
-				p2.Set(650.0 / 304.8);
-				p3.Set(levelId);
-				p4.Set(0.0);
-
+				t.Start("Create");
+				CreateWindows(elem as Wall, app);
+				t.Commit();
 			}
-			catch { }
-			t.Commit();
+
+			UpdaterRegistry.UnregisterUpdater(_updater.GetUpdaterId());
+
+			return Result.Succeeded;
 		}
 
+		private void CreateWindows(Wall wall, Application app)
+		{
+			var locationCurve = (LocationCurve)wall.Location;
+
+			var position = locationCurve.Curve.Evaluate(
+			  0.5, true);
+
+			Document document = wall.Document;
+
+			Level level = (Level)document.GetElement(
+			  wall.LevelId);
+
+			FilteredElementCollector collector = new FilteredElementCollector(document);
+			collector.OfClass(typeof(FamilySymbol)).OfCategory(BuiltInCategory.OST_Windows);
+			FamilySymbol fs = collector.FirstOrDefault<Element>(
+				s => s.Name.Equals("231_Отверстие прямоуг (Окно_Стена)")) as FamilySymbol;
+			if (!fs.IsActive)
+				fs.Activate();
+
+			document.Create.NewFamilyInstance(position, fs,
+				wall, level, StructuralType.NonStructural);
+		}
+
+
+		//Использовать эту перегрузку
+		//NewFamilyInstance Method (XYZ, FamilySymbol, Element, Level, StructuralType)
+
+		// Нужно добавить фильтр, вид должен быть планом!!!
 
 		/*
-		int c = xlFale.ColumnNamber("WIDTH", xlRange);
-		if(c != 0)
-		{
-			// Выполнять только если ColumnNamber != 0 
-		}
+		int colWidht = xsl.ColumnNamber("WIDTH");
+		string content = xsl.CellsContent(2, colWidht);
+		TaskDialog.Show("Show", content);								
+		xsl.CloseAndQuit();
 		*/
+		private static Level GetActiveLevel(Document doc)
+		{
+			Autodesk.Revit.DB.View view = doc.ActiveView;
+			FilteredElementCollector lvlCollector = new FilteredElementCollector(doc);
+			ICollection<Element> lvlCollection = lvlCollector.OfClass(typeof(Level)).ToElements();
 
-		//xlFale.CloseAndQuit(xlFale.App, xlWorkbooks, xlWorkbook,
-		//xlWorksheet, xlRange);
-		return Result.Succeeded;
+			ElementId levelId = null;
+			Level level = null;
+			foreach (Element l in lvlCollection)
+			{
+				Level lvl = l as Level;
+				if (lvl.Name == view.get_Parameter(BuiltInParameter.PLAN_VIEW_LEVEL).AsString())
+				{
+					levelId = lvl.Id;
+					level = lvl;
+				}
+			}
+			return level;
+		}
 	}
-	public class OpenFile
-	{
-		static OpenFileDialog ofd = new OpenFileDialog();
 
-		static OpenFileDialog ShowFileDialog()
+	public class WallPickFilter : ISelectionFilter
+	{
+		public bool AllowElement(Element element)
 		{
-			ofd.Filter = "Excel|*.xls";
-			ofd.ShowDialog();
-			return ofd;
-		}  
-		public string Path
+			return (element.Category.Id.IntegerValue.Equals((int)BuiltInCategory.OST_Walls));
+		}
+		public bool AllowReference(Reference reference, XYZ position)
 		{
-			get { return ShowFileDialog().FileName; }
+			return false;
+		}
+	}
+
+	public class OpeningWatcherUpdater : IUpdater
+	{
+		static AddInId _appId;
+		static UpdaterId _updaterId;
+
+		public OpeningWatcherUpdater(AddInId id)
+		{
+			_appId = id;
+			_updaterId = new UpdaterId(_appId,
+				new Guid("07175566-9bdf-4eed-b456-e3bbce5f9e22"));
+		}
+
+		public void Execute(UpdaterData data)
+		{
+			Document doc = data.GetDocument();
+			Application app = doc.Application;
+
+			foreach (ElementId id in data.GetAddedElementIds())
+			{
+				TaskDialog.Show("ElementIdinUpdater", id.IntegerValue.ToString());
+			}
+		}
+
+		public string GetAdditionalInformation()
+		{
+			return "This uhdater return Id added element";
+		}
+
+		public ChangePriority GetChangePriority()
+		{
+			return ChangePriority.DoorsOpeningsWindows;
+		}
+
+		public UpdaterId GetUpdaterId()
+		{
+			return _updaterId;
+		}
+
+		public string GetUpdaterName()
+		{
+			return "OpeningWatcherUpdater";
 		}
 	}
 }

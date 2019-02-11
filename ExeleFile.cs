@@ -12,84 +12,81 @@ using Microsoft.Win32;
 using System.Diagnostics;
 using System.Windows.Forms;
 
-public class ExeleFile
+namespace ExeleCommand
 {
-	
-	Exele.Application xlApp = new Exele.Application();
+	public class ExeleFile
+	{
+		static OpenFile ofd = new OpenFile();
 
-	public Exele.Workbooks xlWorkbooks (Exele.Application xlApp)
-	{
-		Exele.Workbooks xlWorkbooks = xlApp.Workbooks;
-		return xlWorkbooks;
-	}
-	public Exele.Workbook xlWorkbook (Exele.Workbooks xlWorkbooks, 
-		string path)
-	{
-		Exele.Workbook xlWorkbook = xlWorkbooks.Open(path);
-		return xlWorkbook;
-	}
-	public Exele._Worksheet xlWorksheet (Exele.Workbook xlWorkbook)
-		{
-			Exele._Worksheet xlWorksheet = xlWorkbook.Sheets[1];
-			return xlWorksheet;
-		}
-	public Exele.Range xlRange (Exele._Worksheet xlWorksheet)
-		{
-			Exele.Range xlRange = xlWorksheet.UsedRange;
-			return xlRange;
-		}
-	public Exele.Application App
+		static Exele.Application xlApp = new Exele.Application();
+		static Exele.Workbooks xlWorkBooks = xlApp.Workbooks;
+		static Exele.Workbook xlWorkBook = xlWorkBooks.Open(ofd.Path);
+		static Exele._Worksheet xlWorkSheet = xlWorkBook.Sheets[1];
+		static Exele.Range xlRange = xlWorkSheet.UsedRange;
+
+		// метод возвращает номер столбца
+		//с задонным содержанием первой строки name
+		public int ColumnNamber(string name) 
+		{ 
+			int rowCount = xlRange.Rows.Count;
+			rowCount = 1;
+			int colCount = xlRange.Columns.Count;
+
+			int colNamber = 0;
+
+			for (int i = 1; i <= colCount; i++)
 			{
-				get { return xlApp; }
+				if (xlRange.Cells[rowCount, i].Value2.ToString() == name &&
+					xlRange.Cells[rowCount, i] != null &&
+					xlRange.Cells[rowCount, i].Value2 != null)
+				{
+					colNamber = i;
+				}
 			}
+			return colNamber;
+		}
 
-	public int ColumnNamber(string name, Exele.Range xlRange)
-	{
-		int rowCount = xlRange.Rows.Count;
-		rowCount = 1;
-		int colCount = xlRange.Columns.Count;
-
-		int colNamber = 0;
-	   
-		for (int i = 1; i <= colCount; i++)
+		// метод возвращает содержимое ячейки
+		public string CellsContent(int rowNamber,
+			int colNamber)
 		{
-			if (xlRange.Cells[rowCount,i] == name &&
-				xlRange.Cells[rowCount,i] != null &&
-				xlRange.Cells[rowCount,i].Value2 != null)
-			{
-				colNamber = i;
-			}				
-		} 
-		return colNamber;
+			string content =
+				xlRange.Cells[rowNamber, colNamber].Value2.ToString();
+			return content;
+		}
+
+		// метод закрывает файл и процессы
+		public void CloseAndQuit()
+		{
+			GC.Collect();
+			GC.WaitForPendingFinalizers();
+
+			Marshal.ReleaseComObject(xlRange);
+			Marshal.ReleaseComObject(xlWorkSheet);
+
+			xlWorkBook.Close();
+			Marshal.ReleaseComObject(xlWorkBook);
+
+			Marshal.ReleaseComObject(xlWorkBooks);
+
+			xlApp.Quit();
+			Marshal.ReleaseComObject(xlApp);   
+		}
 	}
 
-	public string CellsContent(int rowNamber, 
-		int colNamber, Exele.Range xlRange)
+	public class OpenFile
 	{
-		string content =
-			xlRange.Cells[rowNamber, colNamber].Value2;
-		return content;
-	}
+		static OpenFileDialog ofd = new OpenFileDialog();
 
-	public void CloseAndQuit(												
-		Exele.Application xlApp,
-		Exele.Workbooks xlWorbooks,
-		Exele.Workbook xlWorkbook,
-		Exele._Worksheet xlWorksheet,
-		Exele.Range xlRange)
-	{
-		GC.Collect();
-		GC.WaitForPendingFinalizers();
-
-		Marshal.ReleaseComObject(xlRange);
-		Marshal.ReleaseComObject(xlWorksheet);
-
-		xlWorkbook.Close();
-		Marshal.ReleaseComObject(xlWorkbook);
-
-		Marshal.ReleaseComObject(xlWorbooks);
-
-		xlApp.Quit();
-		Marshal.ReleaseComObject(xlApp);
+		static OpenFileDialog ShowFileDialog()
+		{
+			ofd.Filter = "Excel|*.xls";
+			ofd.ShowDialog();
+			return ofd;
+		}
+		public string Path
+		{
+			get { return ShowFileDialog().FileName; }
+		}
 	}
 }
