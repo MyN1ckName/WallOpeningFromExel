@@ -18,10 +18,8 @@ using Autodesk.Revit.Utility;
 
 using ExeleCommand;
 
-
 namespace RevitCommand
 {
-
 	[TransactionAttribute(TransactionMode.Manual)]
 	[RegenerationAttribute(RegenerationOption.Manual)]
 
@@ -37,7 +35,7 @@ namespace RevitCommand
 			Document doc = uiApp.ActiveUIDocument.Document;
 			Application app = uiApp.Application;
 
-			//ExeleFile xsl = new ExeleFile();
+			ExeleFile xsl = new ExeleFile();
 
 			Reference pickedRef = null;
 			Selection sel = uiApp.ActiveUIDocument.Selection;
@@ -57,13 +55,42 @@ namespace RevitCommand
 				t.Start("Create");
 				CreateWindows(elem as Wall, app);
 				t.Commit();
+
+				if (_updater.GetElmtId != null)
+				{
+					SetParameters(doc, xsl, _updater.GetElmtId);
+					xsl.CloseAndQuit();
+				}
+				else { xsl.CloseAndQuit(); }
+
 			}
 
 			UpdaterRegistry.UnregisterUpdater(_updater.GetUpdaterId());
 
+			if (_updater.GetElmtId != null)
+			{
+				TaskDialog.Show("This message is command", _updater.GetElmtId.IntegerValue.ToString());
+			}
+
 			return Result.Succeeded;
 		}
 
+		private void SetParameters(Document doc, ExeleFile xsl, ElementId elmtid)
+		{
+			using (Transaction t = new Transaction(doc, "SetParameters"))
+			{
+				t.Start("SetParameters");
+				Element elmt = doc.GetElement(elmtid);
+				Parameter width = elmt.LookupParameter("Рзм.Ширина");
+				Parameter height = elmt.LookupParameter("Рзм.Высота");
+				//Parameter offsetLvl = elmt.get_Parameter(BuiltInParameter.INSTANCE_SILL_HEIGHT_PARAM); // Высота нижнего бруса
+
+				width.SetValueString(xsl.CellsContent(2, xsl.ColumnNamber("WIDTH")));
+				height.SetValueString(xsl.CellsContent(2, xsl.ColumnNamber("HEIGHT")));
+				//height.Set(xsl.CellsContent(2, xsl.ColumnNamber("HEIGHT")));
+				t.Commit();
+			}
+		}
 		private void CreateWindows(Wall wall, Application app)
 		{
 			var locationCurve = (LocationCurve)wall.Location;
@@ -120,7 +147,7 @@ namespace RevitCommand
 		}
 	}
 
-	public class WallPickFilter : ISelectionFilter
+	class WallPickFilter : ISelectionFilter
 	{
 		public bool AllowElement(Element element)
 		{
@@ -136,6 +163,7 @@ namespace RevitCommand
 	{
 		static AddInId _appId;
 		static UpdaterId _updaterId;
+		ElementId eid;
 
 		public OpeningWatcherUpdater(AddInId id)
 		{
@@ -149,10 +177,16 @@ namespace RevitCommand
 			Document doc = data.GetDocument();
 			Application app = doc.Application;
 
-			foreach (ElementId id in data.GetAddedElementIds())
+			if (data.GetAddedElementIds().Count == 1)
 			{
-				TaskDialog.Show("ElementIdinUpdater", id.IntegerValue.ToString());
+				eid = data.GetAddedElementIds().First<ElementId>();
+				//TaskDialog.Show("OpeningWatcherUpdater", eid.IntegerValue.ToString());
 			}
+		}
+
+		public ElementId GetElmtId
+		{
+			get { return eid; }
 		}
 
 		public string GetAdditionalInformation()
